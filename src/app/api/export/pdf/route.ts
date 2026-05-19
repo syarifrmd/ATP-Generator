@@ -2,51 +2,109 @@ export const runtime = 'nodejs';
 
 import PDFDocument from 'pdfkit';
 
-type ATPItem = {
-  hasilTelaah: string;
-  tujuanPembelajaran: string;
+type ATPElementContent = {
+  capaianPembelajaran: string;
   alurTujuanPembelajaran: string;
+  kontenMateri: string;
+  profilPelajarPancasila: string;
+  kataKunci: string;
+  perkiraanJumlahJam: string;
 };
 
-const drawTable = (doc: PDFKit.PDFDocument, rows: ATPItem[], startY: number) => {
+type ATPItem = {
+  namaElemen: string;
+  rows: ATPElementContent[];
+};
+
+const drawTable = (doc: PDFKit.PDFDocument, items: ATPItem[], startY: number) => {
   const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-  const columns = [pageWidth * 0.34, pageWidth * 0.33, pageWidth * 0.33];
-  const labels = ['Capaian Pembelajaran Per Elemen', 'Tujuan Pembelajaran', 'Alur Tujuan Pembelajaran'];
-  const xPositions = [doc.page.margins.left, doc.page.margins.left + columns[0], doc.page.margins.left + columns[0] + columns[1]];
+  // Make the page landscape or just adjust columns: a4 is usually 595.28 x 841.89 points
+  // Wait, we defined the document as A4, which is portrait. Table with 6 columns might be cramped. 
+  // We'll squeeze it as best as possible.
+  const columns = [pageWidth * 0.24, pageWidth * 0.24, pageWidth * 0.15, pageWidth * 0.15, pageWidth * 0.12, pageWidth * 0.10];
+  const labels = [
+    'Capaian Pembelajaran', 
+    'Alur Tujuan Pembelajaran', 
+    'Konten Materi', 
+    'Pelajar Pancasila', 
+    'Kata Kunci', 
+    'JP'
+  ];
+  
+  const xPositions = [
+    doc.page.margins.left, 
+    doc.page.margins.left + columns[0], 
+    doc.page.margins.left + columns[0] + columns[1],
+    doc.page.margins.left + columns[0] + columns[1] + columns[2],
+    doc.page.margins.left + columns[0] + columns[1] + columns[2] + columns[3],
+    doc.page.margins.left + columns[0] + columns[1] + columns[2] + columns[3] + columns[4],
+  ];
 
   const drawCell = (x: number, y: number, width: number, height: number, text: string, bold = false) => {
     doc.rect(x, y, width, height).stroke();
-    doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(9).text(text, x + 6, y + 5, {
-      width: width - 12,
+    doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(8).text(text, x + 4, y + 5, {
+      width: width - 8,
       align: 'justify',
-      lineGap: 3,
+      lineGap: 2,
     });
   };
 
   let currentY = startY;
-  const headerHeight = 28;
-  labels.forEach((label, index) => drawCell(xPositions[index], currentY, columns[index], headerHeight, label, true));
-  currentY += headerHeight;
 
-  rows.forEach((row) => {
-    const heights = [
-      doc.heightOfString(row.hasilTelaah || '', { width: columns[0] - 12, align: 'left' }) + 10,
-      doc.heightOfString(row.tujuanPembelajaran || '', { width: columns[1] - 12, align: 'left' }) + 10,
-      doc.heightOfString(row.alurTujuanPembelajaran || '', { width: columns[2] - 12, align: 'left' }) + 10,
-    ];
-    const rowHeight = Math.max(...heights, 24);
-
-    if (currentY + rowHeight > doc.page.height - doc.page.margins.bottom - 80) {
+  items.forEach((elemen) => {
+    const headerHeight = 24;
+    
+    // Draw element header
+    if (currentY + headerHeight + 30 > doc.page.height - doc.page.margins.bottom) {
       doc.addPage();
       currentY = doc.page.margins.top;
-      labels.forEach((label, index) => drawCell(xPositions[index], currentY, columns[index], headerHeight, label, true));
-      currentY += headerHeight;
+    }
+    
+    doc.font('Helvetica-Bold').fontSize(10);
+    doc.text(`ELEMEN: ${elemen.namaElemen}`, doc.page.margins.left, currentY + 10, {
+      align: 'center', width: pageWidth
+    });
+    currentY += headerHeight + 10;
+    
+    // Check space for table headers
+    if (currentY + 28 > doc.page.height - doc.page.margins.bottom) {
+      doc.addPage();
+      currentY = doc.page.margins.top;
     }
 
-    drawCell(xPositions[0], currentY, columns[0], rowHeight, row.hasilTelaah || '');
-    drawCell(xPositions[1], currentY, columns[1], rowHeight, row.tujuanPembelajaran || '');
-    drawCell(xPositions[2], currentY, columns[2], rowHeight, row.alurTujuanPembelajaran || '');
-    currentY += rowHeight;
+    labels.forEach((label, index) => drawCell(xPositions[index], currentY, columns[index], 28, label, true));
+    currentY += 28;
+
+    if (elemen.rows && Array.isArray(elemen.rows)) {
+      elemen.rows.forEach((row) => {
+        // PDFKit's heightOfString doesn't take size in TextOptions, so we need to set font size first
+        doc.fontSize(8);
+        const heights = [
+          doc.heightOfString(row.capaianPembelajaran || '', { width: columns[0] - 8, align: 'left', lineGap: 2 }) + 10,
+          doc.heightOfString(row.alurTujuanPembelajaran || '', { width: columns[1] - 8, align: 'left', lineGap: 2 }) + 10,
+          doc.heightOfString(row.kontenMateri || '', { width: columns[2] - 8, align: 'left', lineGap: 2 }) + 10,
+          doc.heightOfString(row.profilPelajarPancasila || '', { width: columns[3] - 8, align: 'left', lineGap: 2 }) + 10,
+          doc.heightOfString(row.kataKunci || '', { width: columns[4] - 8, align: 'left', lineGap: 2 }) + 10,
+          doc.heightOfString(row.perkiraanJumlahJam || '', { width: columns[5] - 8, align: 'left', lineGap: 2 }) + 10,
+        ];
+        const rowHeight = Math.max(...heights, 24);
+
+        if (currentY + rowHeight > doc.page.height - doc.page.margins.bottom - 40) {
+          doc.addPage();
+          currentY = doc.page.margins.top;
+          labels.forEach((label, index) => drawCell(xPositions[index], currentY, columns[index], 28, label, true));
+          currentY += 28;
+        }
+
+        drawCell(xPositions[0], currentY, columns[0], rowHeight, row.capaianPembelajaran || '');
+        drawCell(xPositions[1], currentY, columns[1], rowHeight, row.alurTujuanPembelajaran || '');
+        drawCell(xPositions[2], currentY, columns[2], rowHeight, row.kontenMateri || '');
+        drawCell(xPositions[3], currentY, columns[3], rowHeight, row.profilPelajarPancasila || '');
+        drawCell(xPositions[4], currentY, columns[4], rowHeight, row.kataKunci || '');
+        drawCell(xPositions[5], currentY, columns[5], rowHeight, row.perkiraanJumlahJam || '');
+        currentY += rowHeight;
+      });
+    }
   });
 
   return currentY;
@@ -67,7 +125,7 @@ export async function POST(req: Request) {
       cp: string;
     };
 
-    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
+    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true, layout: 'landscape' });
     const chunks: Buffer[] = [];
 
     doc.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
@@ -102,7 +160,7 @@ export async function POST(req: Request) {
     });
 
     doc.moveDown(0.8);
-    doc.font('Helvetica-Bold').text('Capaian Pembelajaran');
+    doc.font('Helvetica-Bold').text('Capaian Pembelajaran:');
     doc.font('Helvetica').fontSize(11).text(cp || '', { align: 'justify', lineGap: 3 });
     doc.moveDown(1);
 
@@ -111,6 +169,11 @@ export async function POST(req: Request) {
 
     const signatureX = doc.page.width - doc.page.margins.right - 190;
     doc.font('Helvetica').fontSize(11);
+    
+    if (doc.y + 80 > doc.page.height - doc.page.margins.bottom) {
+        doc.addPage();
+    }
+    
     doc.text('Mengetahui,', signatureX, doc.y + 10, { width: 180, align: 'center' });
     doc.font('Helvetica-Bold').text(penyusun, signatureX, doc.y + 26, { width: 180, align: 'center' });
     doc.moveDown(4);

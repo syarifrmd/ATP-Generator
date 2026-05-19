@@ -13,6 +13,7 @@
     "@types/pdfkit": "^0.17.6",
     "docx": "^9.6.1",
     "file-saver": "^2.0.5",
+    "framer-motion": "^12.23.7",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "next": "16.2.6",

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { exportToDocx, ATPItem } from '@/lib/docxHelper';
 
 const SMA_MAPEL_OPTIONS = [
@@ -247,6 +247,20 @@ const SMK_MAPEL_OPTIONS = [
   'Usaha Pertanian Terpadu',
 ];
 
+export interface PhaseElement {
+  elementName: string;
+  elementDescription: string;
+}
+
+export interface PhaseDetail {
+  phase: string;
+  description: string;
+  elements: PhaseElement[];
+}
+
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
+
 export default function Home() {
   const [form, setForm] = useState({
     namaSekolah: '',
@@ -263,6 +277,23 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<ATPItem[]>([]);
   const [error, setError] = useState('');
+  const [phaseDetail, setPhaseDetail] = useState<PhaseDetail | null>(null);
+  type ElementOption = {
+    isSelected: boolean;
+    isManual: boolean;
+    manualContent: string;
+  };
+  const [elementOptions, setElementOptions] = useState<Record<string, ElementOption>>({});
+  const [cpLoading, setCpLoading] = useState(false);
+  const [cpError, setCpError] = useState('');
+
+  const localMapelOptions = useMemo(
+    () => ({
+      SMA: SMA_MAPEL_OPTIONS,
+      SMK: SMK_MAPEL_OPTIONS,
+    }),
+    []
+  );
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -270,13 +301,22 @@ export default function Home() {
     setError('');
     setResults([]);
 
+    const elementsData = phaseDetail?.elements
+      .filter(el => elementOptions[el.elementName]?.isSelected)
+      .map(el => ({
+        name: el.elementName,
+        description: el.elementDescription,
+        isManual: elementOptions[el.elementName]?.isManual,
+        manualContent: elementOptions[el.elementName]?.manualContent,
+      })) || [];
+
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, elementsData }),
       });
 
       const data = await res.json();
@@ -285,8 +325,8 @@ export default function Home() {
       }
 
       setResults(data.data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Terjadi kesalahan.'));
     } finally {
       setLoading(false);
     }
@@ -294,6 +334,87 @@ export default function Home() {
 
   const handleExportWord = () => {
     exportToDocx(results, form.mapel, form.kelas, form.namaSekolah, form.fase, form.penyusun, form.nip, form.jp, form.cp);
+  };
+
+  const handleFetchCapaianPembelajaran = async () => {
+    if (!form.mapel) {
+      setCpError('Pilih mata pelajaran terlebih dahulu.');
+      return;
+    }
+    if (!form.fase) {
+      setCpError('Pilih fase terlebih dahulu untuk mengambil target Capaian Pembelajaran.');
+      return;
+    }
+
+    setCpLoading(true);
+    setCpError('');
+    setPhaseDetail(null);
+    setElementOptions({});
+
+    try {
+      const resPhase = await fetch(`/api/kemdikbud/phase-detail?subject=${encodeURIComponent(form.mapel)}&phase=${encodeURIComponent(form.fase)}`);
+
+      if (!resPhase.ok) {
+        throw new Error('Gagal mengambil detail target capaian (Fase/Elemen).');
+      }
+
+      const dataPhase = await resPhase.json();
+      const phaseData = dataPhase?.data as PhaseDetail;
+      setPhaseDetail(phaseData);
+      
+      // Default check all elements
+      if (phaseData && phaseData.elements) {
+        const initialOpts: Record<string, ElementOption> = {};
+        phaseData.elements.forEach((el) => {
+          initialOpts[el.elementName] = {
+            isSelected: true,
+            isManual: false,
+            manualContent: '',
+          };
+        });
+        setElementOptions(initialOpts);
+        
+        // Auto fill phase description to form.cp if empty
+        setForm(prev => ({
+           ...prev,
+           cp: phaseData.description || prev.cp
+        }));
+      }
+    } catch (err: unknown) {
+      setCpError(getErrorMessage(err, 'Gagal mengambil Capaian Pembelajaran dari Kemdikbud.'));
+    } finally {
+      setCpLoading(false);
+    }
+  };
+
+  const toggleElementSelection = (elementName: string) => {
+    setElementOptions(prev => ({
+      ...prev,
+      [elementName]: {
+        ...prev[elementName],
+        isSelected: !prev[elementName].isSelected
+      }
+    }));
+  };
+
+  const toggleElementManual = (elementName: string, isManual: boolean) => {
+    setElementOptions(prev => ({
+      ...prev,
+      [elementName]: {
+        ...prev[elementName],
+        isManual
+      }
+    }));
+  };
+
+  const setElementManualContent = (elementName: string, content: string) => {
+    setElementOptions(prev => ({
+      ...prev,
+      [elementName]: {
+        ...prev[elementName],
+        manualContent: content
+      }
+    }));
   };
 
   const handleExportPdf = async () => {
@@ -353,28 +474,28 @@ export default function Home() {
 
           <div>
             <label className="mb-1 block text-sm font-medium">Mata Pelajaran</label>
-            <select
-              required
-              value={form.mapel}
-              onChange={(e) => setForm({ ...form, mapel: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
-            >
-              <option value="">Pilih mata pelajaran</option>
-              <optgroup label="SMA">
-                {SMA_MAPEL_OPTIONS.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
+            <div className="space-y-1">
+              <input
+                type="text"
+                list="mapel-options"
+                required
+                value={form.mapel}
+                onChange={(e) => setForm({ ...form, mapel: e.target.value })}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+                placeholder="Pilih atau ketik mapel (Cth: Informatika)"
+              />
+              <datalist id="mapel-options">
+                {localMapelOptions.SMA.map((item) => (
+                  <option key={`sma-${item}`} value={item} />
                 ))}
-              </optgroup>
-              <optgroup label="SMK">
-                {SMK_MAPEL_OPTIONS.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
+                {localMapelOptions.SMK.map((item) => (
+                  <option key={`smk-${item}`} value={item} />
                 ))}
-              </optgroup>
-            </select>
+              </datalist>
+              <p className="text-xs text-slate-500">
+                Pilih dari daftar atau ketik manual mapel khusus (mis: &quot;Muatan Lokal&quot;).
+              </p>
+            </div>
           </div>
 
           <div>
@@ -446,7 +567,91 @@ export default function Home() {
           </div>
 
           <div className="md:col-span-2">
-            <label className="mb-1 block text-sm font-medium">Capaian Pembelajaran</label>
+            <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <label className="block text-sm font-medium">Capaian Pembelajaran</label>
+              <button
+                type="button"
+                onClick={handleFetchCapaianPembelajaran}
+                disabled={cpLoading || !form.mapel || !form.fase}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {cpLoading ? 'Mencari...' : 'Cari CP dari Kemdikbud API'}
+              </button>
+            </div>
+            
+            {cpError && (
+              <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-600">
+                {cpError}
+              </div>
+            )}
+
+            {phaseDetail && (
+              <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <h3 className="mb-3 text-sm font-semibold text-slate-800">
+                  Pilih Elemen CP (Fase {phaseDetail.phase})
+                </h3>
+                <div className="mb-4 flex flex-col gap-3">
+                  {phaseDetail.elements.map((el) => {
+                    const opt = elementOptions[el.elementName];
+                    if (!opt) return null;
+                    return (
+                      <div key={el.elementName} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                        <label className="flex cursor-pointer items-start">
+                          <input
+                            type="checkbox"
+                            className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                            checked={opt.isSelected}
+                            onChange={() => toggleElementSelection(el.elementName)}
+                          />
+                          <div className="ml-3">
+                            <h4 className="text-sm font-semibold text-slate-900">{el.elementName}</h4>
+                            <p className="mt-0.5 text-xs text-slate-600 text-justify">{el.elementDescription}</p>
+                          </div>
+                        </label>
+                        
+                        {opt.isSelected && (
+                          <div className="mt-4 ml-7 border-l-2 border-slate-100 pl-4">
+                            <div className="flex gap-4 mb-3">
+                              <label className="flex items-center cursor-pointer text-xs">
+                                <input 
+                                  type="radio" 
+                                  name={`manual-${el.elementName}`}
+                                  className="mr-2 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500"
+                                  checked={!opt.isManual}
+                                  onChange={() => toggleElementManual(el.elementName, false)}
+                                />
+                                Auto Generate Konten Materi
+                              </label>
+                              <label className="flex items-center cursor-pointer text-xs">
+                                <input 
+                                  type="radio" 
+                                  name={`manual-${el.elementName}`}
+                                  className="mr-2 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500"
+                                  checked={opt.isManual}
+                                  onChange={() => toggleElementManual(el.elementName, true)}
+                                />
+                                Manual Konten Materi
+                              </label>
+                            </div>
+                            
+                            {opt.isManual && (
+                              <textarea
+                                rows={3}
+                                value={opt.manualContent}
+                                onChange={(e) => setElementManualContent(el.elementName, e.target.value)}
+                                className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs outline-none focus:border-slate-500"
+                                placeholder="Masukkan topik / konten materi secara manual di sini (pisahkan dengan koma atau baris baru)..."
+                              />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <textarea
               required
               rows={5}
@@ -492,6 +697,12 @@ export default function Home() {
                 >
                   Export Word
                 </button>
+                <button
+                  onClick={handleExportPdf}
+                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                >
+                  Export PDF
+                </button>
               </div>
             </div>
 
@@ -516,24 +727,41 @@ export default function Home() {
                   <p className="mt-2 text-justify text-sm whitespace-pre-wrap" style={{ lineHeight: '1.5', margin: 0, hyphens: 'auto' }}>{form.cp}</p>
                 </div>
 
-                <table className="mt-8 w-full border-collapse border border-black text-sm">
-                  <thead>
-                    <tr>
-                      <th className="border border-black px-3 py-3 text-center align-middle">Capaian Pembelajaran Per Elemen</th>
-                      <th className="border border-black px-3 py-3 text-center align-middle">Tujuan Pembelajaran</th>
-                      <th className="border border-black px-3 py-3 text-center align-middle">Alur Tujuan Pembelajaran</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.map((item, index) => (
-                      <tr key={index}>
-                        <td className="border border-black px-3 py-3 align-top whitespace-pre-wrap text-left" style={{ lineHeight: '1.5' }}>{item.hasilTelaah}</td>
-                        <td className="border border-black px-3 py-3 align-top whitespace-pre-wrap text-justify" style={{ lineHeight: '1.5', hyphens: 'auto' }}>{item.tujuanPembelajaran}</td>
-                        <td className="border border-black px-3 py-3 align-top whitespace-pre-wrap text-justify" style={{ lineHeight: '1.5', hyphens: 'auto' }}>{item.alurTujuanPembelajaran}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="mt-8 space-y-8">
+                  {results.map((elemen, index) => (
+                    <div key={index}>
+                      <h3 className="mb-4 text-center font-bold uppercase bg-yellow-200 px-4 py-1 inline-block mx-auto">
+                        ELEMEN: {" "} {elemen.namaElemen}
+                      </h3>
+                      <div className="w-full overflow-hidden">
+                        <table className="w-full table-fixed border-collapse border border-black text-sm">
+                          <thead className="bg-[#bfe1ed]">
+                            <tr>
+                              <th className="border border-black px-3 py-3 text-center align-middle font-bold w-[25%]">Capaian Pembelajaran</th>
+                              <th className="border border-black px-3 py-3 text-center align-middle font-bold w-[25%]">Alur Tujuan Pembelajaran</th>
+                              <th className="border border-black px-3 py-3 text-center align-middle font-bold w-[15%]">Konten Materi</th>
+                              <th className="border border-black px-3 py-3 text-center align-middle font-bold w-[15%]">Profil Pelajar Pancasila</th>
+                              <th className="border border-black px-3 py-3 text-center align-middle font-bold w-[10%]">Kata Kunci</th>
+                              <th className="border border-black px-3 py-3 text-center align-middle font-bold w-[10%]">Perkiraan Jumlah Jam</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {elemen.rows?.map((row, rIndex) => (
+                              <tr key={rIndex}>
+                                <td className="border border-black px-3 py-3 align-top whitespace-pre-wrap text-justify" style={{ lineHeight: '1.5', hyphens: 'auto' }}>{row.capaianPembelajaran}</td>
+                                <td className="border border-black px-3 py-3 align-top whitespace-pre-wrap text-justify" style={{ lineHeight: '1.5', hyphens: 'auto' }}>{row.alurTujuanPembelajaran}</td>
+                                <td className="border border-black px-3 py-3 align-top text-center" style={{ lineHeight: '1.5' }}>{row.kontenMateri}</td>
+                                <td className="border border-black px-3 py-3 align-top text-center" style={{ lineHeight: '1.5' }}>{row.profilPelajarPancasila}</td>
+                                <td className="border border-black px-3 py-3 align-top text-center" style={{ lineHeight: '1.5' }}>{row.kataKunci}</td>
+                                <td className="border border-black px-3 py-3 align-top text-center font-semibold" style={{ lineHeight: '1.5' }}>{row.perkiraanJumlahJam}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
 
                 <div className="mt-16 flex justify-end text-sm leading-6">
                   <div className="w-64 text-center">

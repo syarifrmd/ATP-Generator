@@ -16,7 +16,20 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { jenjang, fase, kelas, mapel, cp, jp } = body;
+    const { jenjang, fase, kelas, mapel, cp, jp, elementsData } = body;
+
+    let elementsPrompt = '';
+    if (elementsData && elementsData.length > 0) {
+      elementsPrompt = `\nELEMEN YANG DIPILIH DAN KONTEN MATERINYA:\n` + elementsData.map((el: any) => {
+        let text = `- Elemen: ${el.name}\n  Capaian Pembelajaran Elemen: ${el.description}`;
+        if (el.isManual && el.manualContent) {
+          text += `\n  KONTEN MATERI (WAJIB DIGUNAKAN): ${el.manualContent}`;
+        } else {
+          text += `\n  KONTEN MATERI: (Auto-generate oleh AI berdasarkan Capaian Pembelajaran)`;
+        }
+        return text;
+      }).join('\n\n');
+    }
 
     const prompt = `Anda adalah ahli kurikulum pendidikan Indonesia yang berpengalaman membuat ATP sesuai standar Kemendikbud.
 Tolong buatkan Alur Tujuan Pembelajaran (ATP) untuk:
@@ -24,24 +37,32 @@ Tolong buatkan Alur Tujuan Pembelajaran (ATP) untuk:
 - Fase: ${fase}
 - Kelas: ${kelas}
 - Mata Pelajaran: ${mapel}
-- Capaian Pembelajaran: ${cp}
+- Capaian Pembelajaran Keseluruhan: ${cp}
 - JP / Alokasi Waktu Total: ${jp}
+${elementsPrompt}
 
 ATURAN PENTING untuk format output:
-1. HANYA return JSON array tanpa MARKDOWN, backticks, atau blok code.
-2. "hasilTelaah" HARUS DIMULAI dengan "Peserta didik dapat" dan berisi deskripsi PARAGRAF PANJANG yang menjelaskan kompetensi dan elemen penting.
-3. "hasilTelaah" HARUS dalam BULLET POINTS dengan simbol • (titik bulat) di awal setiap item, bukan paragraf utuh. Gunakan \n untuk pisah antar item.
-4. "tujuanPembelajaran" HARUS dalam BULLET POINTS dengan simbol • (titik bulat) di awal setiap item, bukan - atau *. Gunakan \n untuk pisah antar item.
-5. "alurTujuanPembelajaran" HARUS dalam NUMBERED LIST (1., 2., 3., dst). Gunakan \n untuk pisah antar item.
-6. Pastikan setiap TP dan ATP rapi, ringkas, namun komprehensif sesuai standar ATP nasional.
-7. JANGAN ada markdown symbols, HTML tags, atau backticks dalam response.
+1. HANYA return JSON tanpa MARKDOWN, backticks, atau blok code.
+2. Analisis Capaian Pembelajaran (CP) dan HANYA buatkan ATP untuk elemen yang disebutkan di ELEMEN YANG DIPILIH (jika ada). Jangan generate untuk elemen yang tidak disebutkan.
+3. Untuk setiap ELEMEN, pecah/buat urutan pembelajaran per KONTEN MATERI (baris/rows tersendiri). Jika KONTEN MATERI sudah disediakan secara manual, wajib gunakan itu sebagai acuan utama pembagian baris konten materi.
+4. Pastikan setiap baris (row) memiliki: Capaian Pembelajaran yang relevan (potongan CP utama untuk elemen tersebut), Alur Tujuan Pembelajaran (berupa step/list dengan \n), Konten Materi (Topik spesifik), Profil Pelajar Pancasila yang sesuai, Kata Kunci, dan Perkiraan Jumlah Jam.
+5. PENTING: Distribusikan total JP / Alokasi Waktu (${jp}) secara logis ke seluruh "perkiraanJumlahJam" di setiap baris, sehingga jika semua jam dijumlahkan dari seluruh elemen, hasilnya persis sama dengan nilai ${jp}.
+6. Format JAWABAN berupa ARRAY OF OBJECTS (Daftar Elemen). Tiap objek Elemen memiliki properti "namaElemen" dan "rows". "rows" adalah array of object.
 
 Format JSON harus EXACTLY seperti ini:
 [
   {
-    "hasilTelaah": "• Peserta didik dapat [poin 1]\n• Peserta didik dapat [poin 2]\n• Peserta didik dapat [poin 3]",
-    "tujuanPembelajaran": "• [item 1]\\n• [item 2]\\n• [item 3]",
-    "alurTujuanPembelajaran": "1. [urutan pembelajaran pertama]\\n2. [urutan pembelajaran kedua]\\n3. [urutan pembelajaran ketiga]"
+    "namaElemen": "BERPIKIR KOMPUTASIONAL (BK)",
+    "rows": [
+      {
+        "capaianPembelajaran": "Peserta didik mampu memahami alur proses pengembangan program...",
+        "alurTujuanPembelajaran": "1. Memahami proses pengembangan program\\n2. Menuliskan algoritma efisien\\n3. Menganalisis persoalan",
+        "kontenMateri": "Pengembangan Program dan Algoritma",
+        "profilPelajarPancasila": "Bernalar Kritis, Kreatif",
+        "kataKunci": "Program, Algoritma, Efisien",
+        "perkiraanJumlahJam": "12 JP"
+      }
+    ]
   }
 ]
 `;
