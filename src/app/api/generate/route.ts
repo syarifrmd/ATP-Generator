@@ -7,16 +7,9 @@ const apiKey = process.env.GEMINI_API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
 
 export async function POST(req: Request) {
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: 'API key Gemini belum dikonfigurasi di server.' },
-      { status: 500 }
-    );
-  }
-
   try {
     const body = await req.json();
-    const { jenjang, fase, kelas, mapel, cp, jp, elementsData } = body;
+    const { jenjang, fase, kelas, mapel, cp, jp, elementsData, aiProvider = 'gemini' } = body;
 
     let elementsPrompt = '';
     if (elementsData && elementsData.length > 0) {
@@ -67,13 +60,69 @@ Format JSON harus EXACTLY seperti ini:
 ]
 `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-    });
+    let textResult = '';
+
+    if (aiProvider === 'openrouter' || aiProvider === 'groq') {
+      let endpoint = '';
+      let model = '';
+      let authToken = '';
+
+      if (aiProvider === 'groq') {
+        endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+        model = 'llama-3.3-70b-versatile';
+        authToken = process.env.GROQ_API_KEY || '';
+      } else {
+        endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+        model = 'nvidia/nemotron-3-super-120b-a12b:free';
+        authToken = process.env.OPENROUTER_API_KEY || '<OPENROUTER_API_KEY>';
+      }
+
+      if (!authToken || authToken === '<OPENROUTER_API_KEY>') {
+        return NextResponse.json({ error: `API key untuk ${aiProvider} belum dikonfigurasi.` }, { status: 500 });
+      }
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://atp-generator.vercel.app', 
+          'X-Title': 'ATP Generator',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: "Anda adalah asisten AI ahli kurikulum pendidikan Indonesia." },
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.2
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `Gagal mengambil respons dari ${aiProvider}.`);
+      }
+
+      const data = await res.json();
+      textResult = data.choices[0]?.message?.content || '';
+
+    } else {
+      // Default to Gemini
+      if (!apiKey) {
+        return NextResponse.json(
+          { error: 'API key Gemini belum dikonfigurasi di server.' },
+          { status: 500 }
+        );
+      }
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+      });
+      textResult = response.text || '';
+    }
     
-    let textResult = response.text || '';
-    textResult = textResult.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
+    textResult = textResult.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
     
     let parsedData = [];
     try {

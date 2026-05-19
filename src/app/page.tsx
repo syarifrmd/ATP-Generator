@@ -284,7 +284,7 @@ export default function Home() {
     manualContent: string;
   };
   const [elementOptions, setElementOptions] = useState<Record<string, ElementOption>>({});
-  const [aiProvider, setAiProvider] = useState<'gemini' | 'groq'>('gemini');
+  const [aiProvider, setAiProvider] = useState<'gemini' | 'groq' | 'openrouter'>('gemini');
   const [cpLoading, setCpLoading] = useState(false);
   const [cpError, setCpError] = useState('');
 
@@ -686,6 +686,16 @@ export default function Home() {
                     className="mr-2 text-emerald-600 focus:ring-emerald-500"
                   />
                   GroqCloud (Llama 3.3)
+                </label>
+                <label className="flex cursor-pointer items-center text-sm text-slate-700">
+                  <input 
+                    type="radio" 
+                    value="openrouter" 
+                    checked={aiProvider === 'openrouter'} 
+                    onChange={() => setAiProvider('openrouter')} 
+                    className="mr-2 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  OpenRouter (Nemotron)
                 </label>
               </div>
             </div>
