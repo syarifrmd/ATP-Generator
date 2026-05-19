@@ -73,7 +73,7 @@ Format JSON harus EXACTLY seperti ini:
         authToken = process.env.GROQ_API_KEY || '';
       } else {
         endpoint = 'https://openrouter.ai/api/v1/chat/completions';
-        model = 'nvidia/nemotron-3-super-120b-a12b:free';
+        model = 'openai/gpt-oss-120b:free';
         authToken = process.env.OPENROUTER_API_KEY || '<OPENROUTER_API_KEY>';
       }
 
@@ -86,7 +86,7 @@ Format JSON harus EXACTLY seperti ini:
         headers: {
           'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://atp-generator.vercel.app', 
+          'HTTP-Referer': 'https://atp-generator.vercel.app',
           'X-Title': 'ATP Generator',
         },
         body: JSON.stringify({
@@ -121,14 +121,14 @@ Format JSON harus EXACTLY seperti ini:
       });
       textResult = response.text || '';
     }
-    
+
     textResult = textResult.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
-    
+
     let parsedData = [];
     try {
-        parsedData = JSON.parse(textResult);
-    } catch(e) {
-        return NextResponse.json({ error: 'Gagal memparsing respons dari AI. Coba lagi.' }, { status: 500 });
+      parsedData = JSON.parse(textResult);
+    } catch (e) {
+      return NextResponse.json({ error: 'Gagal memparsing respons dari AI. Coba lagi.' }, { status: 500 });
     }
 
     return NextResponse.json({ data: parsedData });
