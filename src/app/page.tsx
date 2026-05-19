@@ -770,6 +770,7 @@ export default function Home() {
                 </h2>
 
                 <div className="mt-6 space-y-1 text-sm leading-relaxed">
+                  <p className="inline-block border-b border-black text-sm font-semibold mb-2">Identitas</p>
                   <div className="flex"><span className="font-semibold w-48">Nama Sekolah</span><span>: {form.namaSekolah}</span></div>
                   <div className="flex"><span className="font-semibold w-48">Nama Mata Pelajaran</span><span>: {form.mapel}</span></div>
                   <div className="flex"><span className="font-semibold w-48">Kelas</span><span>: {form.kelas}</span></div>
