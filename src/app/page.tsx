@@ -284,6 +284,7 @@ export default function Home() {
     manualContent: string;
   };
   const [elementOptions, setElementOptions] = useState<Record<string, ElementOption>>({});
+  const [aiProvider, setAiProvider] = useState<'gemini' | 'groq'>('gemini');
   const [cpLoading, setCpLoading] = useState(false);
   const [cpError, setCpError] = useState('');
 
@@ -316,7 +317,7 @@ export default function Home() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ ...form, elementsData }),
+        body: JSON.stringify({ ...form, elementsData, aiProvider }),
       });
 
       const data = await res.json();
@@ -663,6 +664,31 @@ export default function Home() {
           </div>
 
           <div className="md:col-span-2">
+            <div className="mb-4 flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center">
+              <span className="text-sm font-semibold text-slate-800 sm:w-48">Pilih AI Provider:</span>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex cursor-pointer items-center text-sm text-slate-700">
+                  <input 
+                    type="radio" 
+                    value="gemini" 
+                    checked={aiProvider === 'gemini'} 
+                    onChange={() => setAiProvider('gemini')} 
+                    className="mr-2 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  Google Gemini (Free Tier)
+                </label>
+                <label className="flex cursor-pointer items-center text-sm text-slate-700">
+                  <input 
+                    type="radio" 
+                    value="groq" 
+                    checked={aiProvider === 'groq'} 
+                    onChange={() => setAiProvider('groq')} 
+                    className="mr-2 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  GroqCloud (Llama 3.3)
+                </label>
+              </div>
+            </div>
             <button
               type="submit"
               disabled={loading}
