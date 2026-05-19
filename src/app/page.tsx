@@ -284,7 +284,7 @@ export default function Home() {
     manualContent: string;
   };
   const [elementOptions, setElementOptions] = useState<Record<string, ElementOption>>({});
-  const [aiProvider, setAiProvider] = useState<'gemini' | 'groq' | 'openrouter'>('gemini');
+  const [aiProvider, setAiProvider] = useState<'gemini' | 'groq' | 'openrouter' | 'deepseek' | 'zai'>('gemini');
   const [cpLoading, setCpLoading] = useState(false);
   const [cpError, setCpError] = useState('');
 
@@ -362,7 +362,7 @@ export default function Home() {
       const dataPhase = await resPhase.json();
       const phaseData = dataPhase?.data as PhaseDetail;
       setPhaseDetail(phaseData);
-      
+
       // Default check all elements
       if (phaseData && phaseData.elements) {
         const initialOpts: Record<string, ElementOption> = {};
@@ -374,11 +374,11 @@ export default function Home() {
           };
         });
         setElementOptions(initialOpts);
-        
+
         // Auto fill phase description to form.cp if empty
         setForm(prev => ({
-           ...prev,
-           cp: phaseData.description || prev.cp
+          ...prev,
+          cp: phaseData.description || prev.cp
         }));
       }
     } catch (err: unknown) {
@@ -579,7 +579,7 @@ export default function Home() {
                 {cpLoading ? 'Mencari...' : 'Cari CP dari Kemdikbud API'}
               </button>
             </div>
-            
+
             {cpError && (
               <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-600">
                 {cpError}
@@ -609,13 +609,13 @@ export default function Home() {
                             <p className="mt-0.5 text-xs text-slate-600 text-justify">{el.elementDescription}</p>
                           </div>
                         </label>
-                        
+
                         {opt.isSelected && (
                           <div className="mt-4 ml-7 border-l-2 border-slate-100 pl-4">
                             <div className="flex gap-4 mb-3">
                               <label className="flex items-center cursor-pointer text-xs">
-                                <input 
-                                  type="radio" 
+                                <input
+                                  type="radio"
                                   name={`manual-${el.elementName}`}
                                   className="mr-2 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500"
                                   checked={!opt.isManual}
@@ -624,8 +624,8 @@ export default function Home() {
                                 Auto Generate Konten Materi
                               </label>
                               <label className="flex items-center cursor-pointer text-xs">
-                                <input 
-                                  type="radio" 
+                                <input
+                                  type="radio"
                                   name={`manual-${el.elementName}`}
                                   className="mr-2 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500"
                                   checked={opt.isManual}
@@ -634,7 +634,7 @@ export default function Home() {
                                 Manual Konten Materi
                               </label>
                             </div>
-                            
+
                             {opt.isManual && (
                               <textarea
                                 rows={3}
@@ -668,34 +668,55 @@ export default function Home() {
               <span className="text-sm font-semibold text-slate-800 sm:w-48">Pilih AI Provider:</span>
               <div className="flex flex-wrap gap-4">
                 <label className="flex cursor-pointer items-center text-sm text-slate-700">
-                  <input 
-                    type="radio" 
-                    value="gemini" 
-                    checked={aiProvider === 'gemini'} 
-                    onChange={() => setAiProvider('gemini')} 
+                  <input
+                    type="radio"
+                    value="gemini"
+                    checked={aiProvider === 'gemini'}
+                    onChange={() => setAiProvider('gemini')}
                     className="mr-2 text-emerald-600 focus:ring-emerald-500"
                   />
                   Google Gemini (Free Tier)
                 </label>
                 <label className="flex cursor-pointer items-center text-sm text-slate-700">
-                  <input 
-                    type="radio" 
-                    value="groq" 
-                    checked={aiProvider === 'groq'} 
-                    onChange={() => setAiProvider('groq')} 
+                  <input
+                    type="radio"
+                    value="groq"
+                    checked={aiProvider === 'groq'}
+                    onChange={() => setAiProvider('groq')}
                     className="mr-2 text-emerald-600 focus:ring-emerald-500"
                   />
                   GroqCloud (Llama 3.3)
                 </label>
                 <label className="flex cursor-pointer items-center text-sm text-slate-700">
-                  <input 
-                    type="radio" 
-                    value="openrouter" 
-                    checked={aiProvider === 'openrouter'} 
-                    onChange={() => setAiProvider('openrouter')} 
+                  <input
+                    type="radio"
+                    value="openrouter"
+                    checked={aiProvider === 'openrouter'}
+                    onChange={() => setAiProvider('openrouter')}
                     className="mr-2 text-emerald-600 focus:ring-emerald-500"
                   />
-                  OpenRouter (Nemotron)
+                  OpenRouter (OpenAI OSS)
+                </label>
+
+                <label className='flex cursor-pointer items-center text-sm text-slate-700'>
+                  <input
+                    type="radio"
+                    value="zai"
+                    checked={aiProvider === 'zai'}
+                    onChange={() => setAiProvider('zai')}
+                    className='mr-2 text-emerald-600 focus:ring-emerald-500'
+                  />
+                  OpenRouter (Zai)
+                </label>
+                <label className="flex cursor-pointer items-center text-sm text-slate-700">
+                  <input
+                    type="radio"
+                    value="deepseek"
+                    checked={aiProvider === 'deepseek'}
+                    onChange={() => setAiProvider('deepseek')}
+                    className="mr-2 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  OpenRouter (DeepSeek Free)
                 </label>
               </div>
             </div>

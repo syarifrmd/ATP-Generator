@@ -62,16 +62,28 @@ Format JSON harus EXACTLY seperti ini:
 
     let textResult = '';
 
-    if (aiProvider === 'openrouter' || aiProvider === 'groq') {
+    if (aiProvider === 'openrouter' || aiProvider === 'groq' || aiProvider === 'deepseek' || aiProvider === 'zai') {
       let endpoint = '';
       let model = '';
       let authToken = '';
+      let fetchBody: any = {};
 
       if (aiProvider === 'groq') {
         endpoint = 'https://api.groq.com/openai/v1/chat/completions';
         model = 'llama-3.3-70b-versatile';
         authToken = process.env.GROQ_API_KEY || '';
-      } else {
+      } else if (aiProvider === 'deepseek') {
+        endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+        model = 'poolside/laguna-m.1:free';
+        authToken = process.env.OPENROUTER_API_KEY || '<OPENROUTER_API_KEY>';
+
+      } else if (aiProvider === 'zai') {
+        endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+        model = 'z-ai/glm-4.5-air:free';
+        authToken = process.env.OPENROUTER_API_KEY || '<OPENROUTER_API_KEY>';
+      }
+
+      else {
         endpoint = 'https://openrouter.ai/api/v1/chat/completions';
         model = 'openai/gpt-oss-120b:free';
         authToken = process.env.OPENROUTER_API_KEY || '<OPENROUTER_API_KEY>';
@@ -81,6 +93,15 @@ Format JSON harus EXACTLY seperti ini:
         return NextResponse.json({ error: `API key untuk ${aiProvider} belum dikonfigurasi.` }, { status: 500 });
       }
 
+      fetchBody = {
+        model,
+        messages: [
+          { role: "system", content: "Anda adalah asisten AI ahli kurikulum pendidikan Indonesia." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.2
+      };
+
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -89,14 +110,7 @@ Format JSON harus EXACTLY seperti ini:
           'HTTP-Referer': 'https://atp-generator.vercel.app',
           'X-Title': 'ATP Generator',
         },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: "Anda adalah asisten AI ahli kurikulum pendidikan Indonesia." },
-            { role: "user", content: prompt }
-          ],
-          temperature: 0.2
-        })
+        body: JSON.stringify(fetchBody)
       });
 
       if (!res.ok) {
