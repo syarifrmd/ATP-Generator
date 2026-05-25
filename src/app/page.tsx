@@ -456,8 +456,8 @@ export default function Home() {
     <div className="min-h-screen bg-slate-100 py-8 px-4 text-slate-900">
       <div className="mx-auto max-w-7xl space-y-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight">Generator Alur Tujuan Pembelajaran</h1>
-          <p className="mt-2 text-sm text-slate-600">Isi data sekolah, generate dengan Gemini, lalu unduh hasilnya ke Word atau PDF.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Generator Alur Tujuan Pembelajaran (GenATP)</h1>
+          <p className="mt-2 text-sm text-slate-600">Isi data sekolah, generate dengan AI, lalu unduh hasilnya menjadi word</p>
         </div>
 
         <form onSubmit={handleGenerate} className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:grid-cols-2">
@@ -754,12 +754,7 @@ export default function Home() {
                 >
                   Export Word
                 </button>
-                <button
-                  onClick={handleExportPdf}
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-                >
-                  Export PDF
-                </button>
+              
               </div>
             </div>
 
